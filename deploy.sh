@@ -1,23 +1,24 @@
 #!/bin/bash
+set -euo pipefail
 
-echo "Déploiement du Détecteur de Somnolence sur VPS"
+echo "Deploiement du Detecteur de Somnolence sur VPS"
 echo "=============================================="
 
-# Vérification des droits sudo
-if [ "$EUID" -ne 0 ]; then 
-    echo "Ce script doit être exécuté avec les droits sudo"
+# Verification des droits sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "Ce script doit etre execute avec les droits sudo"
     exit 1
 fi
 
-echo "1. Mise à jour du système..."
+echo "1. Mise a jour du systeme..."
 apt update && apt upgrade -y
 
-echo "2. Installation des dépendances système..."
+echo "2. Installation des dependances systeme..."
 apt install -y python3-pip python3-opencv libopencv-dev python3-venv ffmpeg
 apt install -y libsm6 libxext6 libxrender-dev libglib2.0-0
 apt install -y xorg x11vnc xvfb
 
-echo "3. Création du répertoire du projet..."
+echo "3. Creation du repertoire du projet..."
 mkdir -p /opt/drowsiness_detector
 cp -r ./* /opt/drowsiness_detector/
 
@@ -26,9 +27,16 @@ cd /opt/drowsiness_detector
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install opencv-python mediapipe numpy pygame
+pip install -r requirements.txt
 
-echo "5. Configuration du service systemd..."
+echo "5. Creation de l'utilisateur dedie..."
+useradd -m -s /bin/bash drowsiness 2>/dev/null || true
+usermod -a -G video drowsiness
+
+chown -R drowsiness:drowsiness /opt/drowsiness_detector
+chmod -R 755 /opt/drowsiness_detector
+
+echo "6. Configuration du service systemd..."
 cat > /etc/systemd/system/drowsiness_detector.service << EOL
 [Unit]
 Description=Drowsiness Detector Service
@@ -36,7 +44,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=drowsiness
 WorkingDirectory=/opt/drowsiness_detector
 Environment=DISPLAY=:0
 Environment=PYTHONPATH=/opt/drowsiness_detector
@@ -48,7 +56,7 @@ RestartSec=3
 WantedBy=multi-user.target
 EOL
 
-echo "6. Configuration de l'écran virtuel..."
+echo "7. Configuration de l'ecran virtuel..."
 cat > /etc/X11/xorg.conf << EOL
 Section "Device"
     Identifier "Dummy Driver"
@@ -71,55 +79,45 @@ Section "Screen"
 EndSection
 EOL
 
-echo "7. Configuration de la sécurité..."
-# Création de l'utilisateur dédié
-useradd -m -s /bin/bash drowsiness 2>/dev/null || true
-usermod -aG sudo drowsiness
-usermod -a -G video drowsiness
-
-# Configuration des permissions
-chown -R drowsiness:drowsiness /opt/drowsiness_detector
-chmod -R 755 /opt/drowsiness_detector
-
-# Configuration du pare-feu
-ufw enable
+echo "8. Configuration du pare-feu..."
+# IMPORTANT: allow SSH BEFORE enabling ufw to avoid lockout
 ufw allow ssh
 ufw allow http
 ufw allow https
+ufw --force enable
 
-echo "8. Installation des outils de monitoring..."
+echo "9. Installation des outils de monitoring..."
 apt install -y htop
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --non-interactive
+# Install netdata from apt instead of piping curl to bash
+apt install -y netdata || echo "netdata non disponible dans les depots, ignoré"
 
-echo "9. Configuration des sauvegardes..."
-cat > /opt/drowsiness_detector/backup.sh << EOL
+echo "10. Configuration des sauvegardes..."
+cat > /opt/drowsiness_detector/backup.sh << 'EOL'
 #!/bin/bash
 BACKUP_DIR="/backup/drowsiness_detector"
-DATE=\$(date +%Y%m%d_%H%M%S)
+DATE=$(date +%Y%m%d_%H%M%S)
 
-mkdir -p \$BACKUP_DIR
-tar -czf \$BACKUP_DIR/drowsiness_detector_\$DATE.tar.gz /opt/drowsiness_detector/
-find \$BACKUP_DIR -type f -mtime +7 -name '*.tar.gz' -delete
+mkdir -p "$BACKUP_DIR"
+tar -czf "$BACKUP_DIR/drowsiness_detector_$DATE.tar.gz" /opt/drowsiness_detector/
+find "$BACKUP_DIR" -type f -mtime +7 -name '*.tar.gz' -delete
 EOL
 
 chmod +x /opt/drowsiness_detector/backup.sh
+chown drowsiness:drowsiness /opt/drowsiness_detector/backup.sh
 
-echo "10. Démarrage des services..."
-# Démarrage de l'écran virtuel
+echo "11. Demarrage des services..."
 export DISPLAY=:0
 Xvfb :0 -screen 0 1920x1080x24 &
 
-# Configuration du service
 systemctl daemon-reload
 systemctl enable drowsiness_detector
 systemctl start drowsiness_detector
 
-echo "11. Vérification du statut..."
+echo "12. Verification du statut..."
 systemctl status drowsiness_detector
 
 echo "=============================================="
-echo "Installation terminée !"
+echo "Installation terminee !"
 echo "Pour voir les logs : sudo journalctl -u drowsiness_detector -f"
-echo "Pour vérifier le statut : sudo systemctl status drowsiness_detector"
-echo "Interface de monitoring : http://votre-ip:19999"
-echo "==============================================" 
+echo "Pour verifier le statut : sudo systemctl status drowsiness_detector"
+echo "=============================================="

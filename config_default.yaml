@@ -1,0 +1,27 @@
+# SafeDrive - Configuration par defaut
+# Copiez ce fichier vers config.yaml et modifiez selon vos besoins.
+
+detection:
+  eye_closed_threshold: 0.02
+  mouth_open_threshold: 0.4
+  mouth_aspect_ratio_threshold: 0.6
+  head_rotation_threshold: 0.2
+  head_tilt_threshold: 0.1
+  eyes_closed_time_threshold: 20.0
+  phone_detection_threshold: 5.0
+
+camera:
+  index: 0
+
+alert:
+  alarm_path: "data/alarm.wav"
+  levels:
+    NORMAL:
+      color: [0, 255, 0]
+      sound: false
+    WARNING:
+      color: [0, 255, 255]
+      sound: false
+    DANGER:
+      color: [0, 0, 255]
+      sound: true

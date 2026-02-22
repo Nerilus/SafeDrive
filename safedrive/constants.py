@@ -1,0 +1,24 @@
+# Indices des landmarks MediaPipe Face Mesh
+
+# Points des yeux
+LEFT_EYE_TOP = 386
+LEFT_EYE_BOTTOM = 374
+RIGHT_EYE_TOP = 159
+RIGHT_EYE_BOTTOM = 145
+
+# Points pour la bouche (baillement)
+MOUTH_TOP = 13
+MOUTH_BOTTOM = 14
+MOUTH_LEFT = 78
+MOUTH_RIGHT = 308
+MOUTH_INNER_TOP = 12
+MOUTH_INNER_BOTTOM = 15
+
+# Points pour la position de la tete
+NOSE_TIP = 1
+LEFT_EAR = 234
+RIGHT_EAR = 454
+FOREHEAD = 10
+CHIN = 152
+LEFT_TEMPLE = 447
+RIGHT_TEMPLE = 227

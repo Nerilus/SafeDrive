@@ -1,59 +1,44 @@
-# Guide de Déploiement sur VPS
+# Guide de Deploiement sur VPS
 
-## Prérequis VPS
+## Prerequis VPS
 
-- Ubuntu 20.04 ou plus récent
-- Au moins 2GB de RAM
-- 20GB d'espace disque
-- Accès SSH root ou sudo
+- Ubuntu 20.04 ou plus recent
+- Au moins 2 GB de RAM
+- 20 GB d'espace disque
+- Acces SSH root ou sudo
 
-## 1. Installation des Dépendances Système
+## 1. Installation des Dependances Systeme
 
 ```bash
-# Mise à jour du système
 sudo apt update
 sudo apt upgrade -y
 
-# Installation des paquets nécessaires
-sudo apt install -y python3-pip
-sudo apt install -y python3-opencv
-sudo apt install -y libopencv-dev
-sudo apt install -y python3-venv
-sudo apt install -y ffmpeg
-
-# Installation des dépendances pour OpenCV et MediaPipe
-sudo apt install -y libsm6 libxext6 libxrender-dev
-sudo apt install -y libglib2.0-0
+sudo apt install -y python3-pip python3-opencv libopencv-dev python3-venv ffmpeg
+sudo apt install -y libsm6 libxext6 libxrender-dev libglib2.0-0
 ```
 
 ## 2. Configuration de l'Environnement
 
 ```bash
-# Création du répertoire du projet
 mkdir -p /opt/drowsiness_detector
 cd /opt/drowsiness_detector
 
-# Création de l'environnement virtuel
 python3 -m venv venv
 source venv/bin/activate
 
-# Installation des dépendances Python
 pip install --upgrade pip
-pip install opencv-python
-pip install mediapipe
-pip install numpy
-pip install pygame
+pip install -r requirements.txt
 ```
 
 ## 3. Configuration du Service Systemd
 
-Créez un fichier service pour gérer le démarrage automatique :
+Creez le fichier service :
 
 ```bash
 sudo nano /etc/systemd/system/drowsiness_detector.service
 ```
 
-Contenu du fichier service :
+Contenu :
 ```ini
 [Unit]
 Description=Drowsiness Detector Service
@@ -61,7 +46,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=drowsiness
 WorkingDirectory=/opt/drowsiness_detector
 Environment=DISPLAY=:0
 Environment=PYTHONPATH=/opt/drowsiness_detector
@@ -73,15 +58,13 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-## 4. Configuration de X11 (pour l'affichage)
+> **Note :** Le service tourne sous l'utilisateur `drowsiness` (et non `root`) pour des raisons de securite.
+
+## 4. Configuration de X11 (affichage)
 
 ```bash
-# Installation de X11
-sudo apt install -y xorg
-sudo apt install -y x11vnc
-sudo apt install -y xvfb
+sudo apt install -y xorg x11vnc xvfb
 
-# Configuration de l'écran virtuel
 sudo nano /etc/X11/xorg.conf
 ```
 
@@ -108,130 +91,87 @@ Section "Screen"
 EndSection
 ```
 
-## 5. Script de Déploiement
-
-Créez un script de déploiement `deploy.sh` :
+## 5. Script de Deploiement
 
 ```bash
-#!/bin/bash
-
-# Arrêt du service existant
-sudo systemctl stop drowsiness_detector
-
-# Copie des fichiers du projet
-sudo cp -r ./* /opt/drowsiness_detector/
-
-# Installation des dépendances
-cd /opt/drowsiness_detector
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Démarrage du service
-sudo systemctl daemon-reload
-sudo systemctl enable drowsiness_detector
-sudo systemctl start drowsiness_detector
-
-# Vérification du statut
-sudo systemctl status drowsiness_detector
+chmod +x deploy.sh
+sudo ./deploy.sh
 ```
+
+Le script `deploy.sh` automatise toutes les etapes ci-dessus.
 
 ## 6. Commandes de Gestion
 
 ```bash
-# Démarrer le service
 sudo systemctl start drowsiness_detector
-
-# Arrêter le service
 sudo systemctl stop drowsiness_detector
-
-# Redémarrer le service
 sudo systemctl restart drowsiness_detector
-
-# Voir les logs
 sudo journalctl -u drowsiness_detector -f
-
-# Vérifier le statut
 sudo systemctl status drowsiness_detector
 ```
 
-## 7. Configuration de la Caméra
+## 7. Configuration de la Camera
 
-Si vous utilisez une caméra IP ou une webcam réseau :
+Pour une camera IP ou webcam reseau, creez un fichier `config.yaml` :
 
-```python
-# Modifiez la ligne dans main.py
-cap = cv2.VideoCapture("rtsp://username:password@camera_ip:554/stream1")
+```yaml
+camera:
+  index: 0  # ou une URL RTSP : "rtsp://user:pass@ip:554/stream1"
 ```
 
-## 8. Sécurité
+## 8. Securite
 
-1. Configurez un pare-feu :
-```bash
-sudo ufw enable
-sudo ufw allow ssh
-sudo ufw allow http
-sudo ufw allow https
-```
+Le script `deploy.sh` applique automatiquement :
 
-2. Créez un utilisateur dédié :
-```bash
-sudo useradd -m -s /bin/bash drowsiness
-sudo usermod -aG sudo drowsiness
-```
+1. **Pare-feu** — SSH est autorise *avant* l'activation de ufw pour eviter le verrouillage :
+   ```bash
+   sudo ufw allow ssh
+   sudo ufw --force enable
+   ```
 
-3. Configurez les permissions :
-```bash
-sudo chown -R drowsiness:drowsiness /opt/drowsiness_detector
-sudo chmod -R 755 /opt/drowsiness_detector
-```
+2. **Utilisateur dedie** — le service tourne sous `drowsiness`, pas `root` :
+   ```bash
+   sudo useradd -m -s /bin/bash drowsiness
+   sudo usermod -a -G video drowsiness
+   ```
+
+3. **Permissions** :
+   ```bash
+   sudo chown -R drowsiness:drowsiness /opt/drowsiness_detector
+   sudo chmod -R 755 /opt/drowsiness_detector
+   ```
 
 ## 9. Surveillance
 
-Installez des outils de monitoring :
-
 ```bash
-# Installation de htop pour la surveillance des ressources
-sudo apt install htop
-
-# Installation de netdata pour le monitoring web
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+sudo apt install -y htop
+sudo apt install -y netdata
 ```
 
 ## 10. Sauvegarde
 
-Créez un script de sauvegarde `backup.sh` :
+Le script `backup.sh` est cree automatiquement par `deploy.sh` dans `/opt/drowsiness_detector/`.
 
 ```bash
-#!/bin/bash
-BACKUP_DIR="/backup/drowsiness_detector"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-# Création du répertoire de sauvegarde
-mkdir -p $BACKUP_DIR
-
-# Sauvegarde des fichiers du projet
-tar -czf $BACKUP_DIR/drowsiness_detector_$DATE.tar.gz /opt/drowsiness_detector/
-
-# Suppression des sauvegardes de plus de 7 jours
-find $BACKUP_DIR -type f -mtime +7 -name '*.tar.gz' -delete
+sudo -u drowsiness /opt/drowsiness_detector/backup.sh
 ```
 
-## Dépannage
+## Depannage
 
-1. Si l'affichage ne fonctionne pas :
-```bash
-export DISPLAY=:0
-sudo Xvfb :0 -screen 0 1920x1080x24 &
-```
+1. Affichage :
+   ```bash
+   export DISPLAY=:0
+   sudo Xvfb :0 -screen 0 1920x1080x24 &
+   ```
 
-2. Si la caméra n'est pas détectée :
-```bash
-ls -l /dev/video*
-sudo usermod -a -G video drowsiness
-```
+2. Camera non detectee :
+   ```bash
+   ls -l /dev/video*
+   sudo usermod -a -G video drowsiness
+   ```
 
-3. Si le service ne démarre pas :
-```bash
-sudo systemctl status drowsiness_detector
-sudo journalctl -u drowsiness_detector -n 50
-``` 
+3. Service ne demarre pas :
+   ```bash
+   sudo systemctl status drowsiness_detector
+   sudo journalctl -u drowsiness_detector -n 50
+   ```

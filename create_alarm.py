@@ -1,35 +1,35 @@
-import numpy as np
-from scipy.io import wavfile
 import os
 
+import numpy as np
+from scipy.io import wavfile
+
+# Resolve paths relative to this file's directory
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_DATA_DIR = os.path.join(_HERE, "data")
+
+
 def create_alarm():
-    # Paramètres du son
-    sample_rate = 44100  # Hz
-    duration = 1.0  # secondes
-    frequency = 440.0  # Hz (note La)
-    
-    # Création du signal
+    sample_rate = 44100
+    duration = 1.0
+    frequency = 440.0
+
     t = np.linspace(0, duration, int(sample_rate * duration))
     signal = np.sin(2 * np.pi * frequency * t)
-    
-    # Ajout d'une enveloppe pour éviter les clics
+
     envelope = np.ones_like(signal)
     attack = int(0.1 * sample_rate)
     release = int(0.1 * sample_rate)
     envelope[:attack] = np.linspace(0, 1, attack)
     envelope[-release:] = np.linspace(1, 0, release)
     signal = signal * envelope
-    
-    # Normalisation
+
     signal = np.int16(signal * 32767)
-    
-    # Création du dossier data si nécessaire
-    os.makedirs("data", exist_ok=True)
-    
-    # Sauvegarde du fichier
-    output_path = "data/alarm.wav"
+
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    output_path = os.path.join(_DATA_DIR, "alarm.wav")
     wavfile.write(output_path, sample_rate, signal)
-    print(f"Fichier audio créé avec succès dans {output_path}")
+    print(f"Fichier audio cree avec succes dans {output_path}")
+
 
 if __name__ == "__main__":
-    create_alarm() 
+    create_alarm()
